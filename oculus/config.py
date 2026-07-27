@@ -98,6 +98,10 @@ class Config:
     cluster: Cluster = field(default_factory=Cluster)
     email: Email = field(default_factory=Email)
     enrich_cves: bool = True
+    # Rolling display window: only show stories with activity in the last N days,
+    # so the dashboard reflects *current* news and the count rises/falls over time.
+    # 0 = no limit (keep everything). Overridable via config.yaml.
+    retention_days: int = 14
 
 
 def _load_sources(path: Path) -> tuple[Source, ...]:
@@ -151,7 +155,8 @@ def _apply_overrides(cfg: Config, data: dict) -> Config:
     rank = cfg.rank
     if "watchlist" in data:
         rank = replace(rank, watchlist=tuple(data["watchlist"]))
-    return replace(cfg, email=email, rank=rank)
+    retention = int(data.get("retention_days", cfg.retention_days))
+    return replace(cfg, email=email, rank=rank, retention_days=retention)
 
 
 def _apply_env(cfg: Config) -> Config:

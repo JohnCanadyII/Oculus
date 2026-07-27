@@ -182,6 +182,13 @@ def build_ranked(cfg: Config, store: Store) -> list[RankedCluster]:
             articles=r_articles, cves=r_cves, tags=cluster_tags,
         ))
 
+    # Rolling display window: drop clusters whose most recent article is older
+    # than retention_days, so the dashboard shows *current* news and the story
+    # count naturally rises and falls as feeds update. 0 = keep everything.
+    if cfg.retention_days and cfg.retention_days > 0:
+        cutoff = now - cfg.retention_days * 86400
+        out = [c for c in out if c.last_seen >= cutoff]
+
     out.sort(key=lambda x: (x.score, x.last_seen), reverse=True)
     return out
 

@@ -28,6 +28,21 @@ SEV_COLOR = {
 SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NONE"]
 CAT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#4a3aa7"]
 
+# Single source of truth for domain colors — used by BOTH the coverage chart and
+# the story chips, so a category is the same color everywhere (blue=security,
+# orange=networking, green=bigtech, yellow=advisory, magenta=tech). Severity chips
+# (CVSS/KEV) reuse SEV_COLOR, which is also what the severity chart uses.
+DOMAIN_ORDER = ["security", "networking", "bigtech", "advisory", "tech"]
+DOMAIN_COLOR = {
+    "security": "#2a78d6",    # blue
+    "networking": "#eb6834",  # orange
+    "bigtech": "#1baf7a",     # green
+    "advisory": "#eda100",    # yellow
+    "tech": "#e87ba4",        # magenta
+}
+OUTLETS_COLOR = "#6b6f76"     # neutral grey — velocity metadata, not a category
+NEWS_COLOR = "#4a3aa7"        # violet — the "plain news, no CVE/domain" fallback
+
 
 def _esc(s: str) -> str:
     return html.escape(s or "")
@@ -72,14 +87,14 @@ def _chip(text, color, fg="#fff"):
 def _story_chips(c):
     chips = []
     if c.any_kev:
-        chips.append(_chip("KEV", "#d03b3b"))
+        chips.append(_chip("KEV", SEV_COLOR["CRITICAL"]))          # red = Critical bar
     if c.max_cvss is not None:
-        chips.append(_chip(f"CVSS {c.max_cvss:.1f}", SEV_COLOR[c.worst_severity]))
+        chips.append(_chip(f"CVSS {c.max_cvss:.1f}", SEV_COLOR[c.worst_severity]))  # matches severity chart
     if c.source_count > 1:
-        chips.append(_chip(f"{c.source_count} outlets", "#2a78d6"))
+        chips.append(_chip(f"{c.source_count} outlets", OUTLETS_COLOR))
     dt = _domain_tag(c)
-    if dt in ("networking", "bigtech", "advisory"):
-        chips.append(_chip(dt, CAT[2] if dt == "networking" else CAT[1]))
+    if dt in ("networking", "bigtech", "advisory", "tech"):        # matches coverage chart
+        chips.append(_chip(dt, DOMAIN_COLOR[dt]))
     return " ".join(chips)
 
 
@@ -112,11 +127,10 @@ def _severity_chart(clusters, small=False):
 
 
 def _coverage_chart(clusters, small=False):
-    tags = ["security", "networking", "bigtech", "advisory", "tech"]
-    tc = _tag_counts(clusters, tags)
+    tc = _tag_counts(clusters, DOMAIN_ORDER)
     total = max(sum(tc.values()), 1)
-    return "".join(_bar_row(t.title(), tc[t], total, CAT[i % len(CAT)], small)
-                   for i, t in enumerate(tags) if tc[t])
+    return "".join(_bar_row(t.title(), tc[t], total, DOMAIN_COLOR[t], small)
+                   for t in DOMAIN_ORDER if tc[t])
 
 
 def _stat_tile(value, label, accent):
@@ -214,7 +228,7 @@ def _card(c, now):
     return f"""<a class="card" href="{_esc(_url(c))}">
       <div class="card-title">{_esc(_title(c))}</div>
       <div class="card-meta">{_esc(_outlets(c))} · {_ago(c.last_seen, now)}</div>
-      <div class="card-chips">{_story_chips(c) or _chip(_domain_tag(c) or 'news', '#4a3aa7')}</div></a>"""
+      <div class="card-chips">{_story_chips(c) or _chip(_domain_tag(c) or 'news', DOMAIN_COLOR.get(_domain_tag(c), NEWS_COLOR))}</div></a>"""
 
 
 def _view_triage(clusters, now, top):
@@ -351,7 +365,12 @@ _CSS = """
   .score-fill { height:100%; background:var(--accent); border-radius:4px; }
   .score-num { font-variant-numeric:tabular-nums; font-size:13px; color:var(--ink2); }
   .muted { color:var(--muted); }
-  footer { color:var(--muted); font-size:12px; margin-top:34px; border-top:1px solid var(--border); padding-top:14px; }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:30px; padding:14px 0 0;
+    border-top:1px solid var(--border); font-size:12px; color:var(--ink2); }
+  .lg { display:inline-flex; align-items:center; gap:6px; }
+  .lg i { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .lg-sep { width:1px; background:var(--border); align-self:stretch; }
+  footer { color:var(--muted); font-size:12px; margin-top:20px; border-top:1px solid var(--border); padding-top:14px; }
   /* Threat Wire */
   .wire { background:#08080c; border:1px solid #1c1c26; border-radius:8px; overflow:hidden;
     font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
@@ -416,6 +435,19 @@ _PAGE = """<!doctype html>
     </div>
   </header>
   {views}
+  <div class="legend">
+    <span class="lg"><i style="background:#d03b3b"></i>Critical / KEV</span>
+    <span class="lg"><i style="background:#ec835a"></i>High</span>
+    <span class="lg"><i style="background:#fab219"></i>Medium</span>
+    <span class="lg"><i style="background:#0ca30c"></i>Low</span>
+    <span class="lg-sep"></span>
+    <span class="lg"><i style="background:#2a78d6"></i>Security</span>
+    <span class="lg"><i style="background:#eb6834"></i>Networking</span>
+    <span class="lg"><i style="background:#1baf7a"></i>Bigtech</span>
+    <span class="lg"><i style="background:#eda100"></i>Advisory</span>
+    <span class="lg"><i style="background:#e87ba4"></i>Tech</span>
+    <span class="lg"><i style="background:#6b6f76"></i>N outlets (velocity)</span>
+  </div>
   <footer>{display} · keyless security + networking/enterprise-tech intelligence · news-first ranking
     (recency + velocity + source + keyword = 70%, CVE signals = 30%). Severity follows the CISA/FIRST
     status scale. CVE data from CVE Program, CISA KEV, and FIRST EPSS.</footer>

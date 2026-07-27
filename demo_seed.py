@@ -72,6 +72,10 @@ CVE_FIXTURES = {
 
 def main():
     cfg = config_mod.load()
+    # The captured fixtures are 22–39 days old; widen the window so the demo stays
+    # full. Real installs use the default 14-day rolling window (config.retention_days).
+    from dataclasses import replace
+    cfg = replace(cfg, retention_days=60)
     db = config_mod.config_home() / "demo.db"
     if db.exists():
         db.unlink()

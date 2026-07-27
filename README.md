@@ -61,7 +61,13 @@ email:
   recipients: [team@example.com]
   top: 15
 watchlist: [cisco, "ios xe", sharepoint, fortinet, palo alto]
+retention_days: 14   # rolling window: only show stories from the last N days (0 = keep all)
 ```
+
+`oculus scrape` is what pulls fresh headlines — loading the dashboard just
+re-renders the current store. With `retention_days` set, the dashboard shows only
+recent news, so the story count naturally rises and falls day to day as feeds
+update. Set it to `0` to keep an ever-growing archive instead.
 
 Put the SMTP password in the environment, not the file:
 
