@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Oculus runtime / local output
+*.db
+*.db-wal
+*.db-shm
+*_dashboard.html
+*.png
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

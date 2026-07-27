@@ -1,0 +1,14 @@
+Oculus — Copyright (C) 2026 John Canady II
+
+This program is licensed under the GNU Affero General Public License v3.0
+(AGPL-3.0-or-later), to match the upstream project it is derived from.
+
+The full license text is not bundled in this placeholder. To finalize:
+  • On GitHub: "Add file" → "Create new file" → name it LICENSE → GitHub offers
+    a license template picker → choose "GNU Affero General Public License v3.0".
+  • Or paste the text from: https://www.gnu.org/licenses/agpl-3.0.txt
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+You are free to change this to a more permissive license (e.g. MIT, Apache-2.0)
+IF the derivation terms allow — see README/BUILD_PLAN notes on licensing.

@@ -1,0 +1,112 @@
+# Oculus — default feed set.
+# Personalize freely: add/remove entries, change weights (0.0–1.0), toggle `enabled`.
+# `tags` drive filtering (e.g. `oculus digest --tag networking`).
+
+# ── Security news ─────────────────────────────────────────────
+- name: krebs
+  title: Krebs on Security
+  url: https://krebsonsecurity.com/feed/
+  weight: 1.0
+  tags: [security, news]
+  enabled: true
+
+- name: thehackernews
+  title: The Hacker News
+  url: https://feeds.feedburner.com/TheHackersNews
+  weight: 0.8
+  tags: [security, news]
+  enabled: true
+
+- name: bleepingcomputer
+  title: BleepingComputer
+  url: https://www.bleepingcomputer.com/feed/
+  weight: 0.9
+  tags: [security, news]
+  enabled: true
+
+- name: securityweek
+  title: SecurityWeek
+  url: https://www.securityweek.com/feed/
+  weight: 0.8
+  tags: [security, news]
+  enabled: true
+
+- name: darkreading
+  title: Dark Reading
+  url: https://www.darkreading.com/rss.xml
+  weight: 0.8
+  tags: [security, news]
+  enabled: true
+
+- name: theregister
+  title: The Register (Security)
+  url: https://www.theregister.com/security/headlines.atom
+  weight: 0.8
+  tags: [security, news]
+  enabled: true
+
+# ── Authoritative advisories ──────────────────────────────────
+- name: cisa
+  title: CISA Advisories
+  url: https://www.cisa.gov/cybersecurity-advisories/all.xml
+  weight: 1.0
+  tags: [security, advisory, gov]
+  enabled: true
+
+- name: cisco_psirt
+  title: Cisco Security Advisories
+  url: https://sec.cloudapps.cisco.com/security/center/psirtrss20/CiscoSecurityAdvisory.xml
+  weight: 1.0
+  tags: [security, advisory, networking, vendor]
+  enabled: true
+
+- name: msrc
+  title: Microsoft Security Response Center
+  url: https://msrc.microsoft.com/blog/feed/
+  weight: 0.9
+  tags: [security, advisory, bigtech, vendor]
+  enabled: true
+
+# ── Networking & enterprise tech ──────────────────────────────
+- name: cisco_blogs
+  title: Cisco Blogs
+  url: https://blogs.cisco.com/feed
+  weight: 0.7
+  tags: [networking, vendor, tech]
+  enabled: true
+
+- name: networkworld
+  title: Network World
+  url: https://www.networkworld.com/index.rss
+  weight: 0.7
+  tags: [networking, tech]
+  enabled: true
+
+- name: packetpushers
+  title: Packet Pushers
+  url: https://packetpushers.net/feed/
+  weight: 0.6
+  tags: [networking, tech]
+  enabled: true
+
+# ── Big-tech / industry news ──────────────────────────────────
+- name: arstechnica
+  title: Ars Technica
+  url: https://feeds.arstechnica.com/arstechnica/index
+  weight: 0.7
+  tags: [tech, bigtech, news]
+  enabled: true
+
+- name: theverge
+  title: The Verge
+  url: https://www.theverge.com/rss/index.xml
+  weight: 0.6
+  tags: [tech, bigtech, news]
+  enabled: true
+
+- name: techcrunch
+  title: TechCrunch
+  url: https://techcrunch.com/feed/
+  weight: 0.6
+  tags: [tech, bigtech, news]
+  enabled: true
