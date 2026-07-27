@@ -20,28 +20,32 @@ from datetime import datetime, timezone
 from .config import DISPLAY_NAME
 from .ingest import RankedCluster
 
-# Validated status palette (dataviz skill) — severity is a *status*, not a series.
+# ── The palette: FIVE colors only — grey, purple, green, blue, red ─────────────
+# Used consistently across every chart and every chip. No orange, yellow, or pink.
+RED = "#d84141"
+BLUE = "#2f7fd6"
+GREEN = "#1f9d6b"
+PURPLE = "#8b5cf6"
+GREY = "#6f7480"
+
+# Severity (heat, hot→cool within the palette): critical=red … none=grey.
 SEV_COLOR = {
-    "CRITICAL": "#d03b3b", "HIGH": "#ec835a", "MEDIUM": "#fab219",
-    "LOW": "#0ca30c", "NONE": "#898781",
+    "CRITICAL": RED, "HIGH": PURPLE, "MEDIUM": BLUE, "LOW": GREEN, "NONE": GREY,
 }
 SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NONE"]
-CAT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#4a3aa7"]
 
-# Single source of truth for domain colors — used by BOTH the coverage chart and
-# the story chips, so a category is the same color everywhere (blue=security,
-# orange=networking, green=bigtech, yellow=advisory, magenta=tech). Severity chips
-# (CVSS/KEV) reuse SEV_COLOR, which is also what the severity chart uses.
+# Domains — same five colors, one per category, used by BOTH the coverage chart
+# and the story chips so a category is the same color everywhere.
 DOMAIN_ORDER = ["security", "networking", "bigtech", "advisory", "tech"]
 DOMAIN_COLOR = {
-    "security": "#2a78d6",    # blue
-    "networking": "#eb6834",  # orange
-    "bigtech": "#1baf7a",     # green
-    "advisory": "#eda100",    # yellow
-    "tech": "#e87ba4",        # magenta
+    "security": BLUE,        # blue
+    "networking": PURPLE,    # purple
+    "bigtech": GREEN,        # green
+    "advisory": RED,         # red
+    "tech": GREY,            # grey
 }
-OUTLETS_COLOR = "#6b6f76"     # neutral grey — velocity metadata, not a category
-NEWS_COLOR = "#4a3aa7"        # violet — the "plain news, no CVE/domain" fallback
+OUTLETS_COLOR = GREY         # neutral grey — velocity metadata, not a category
+NEWS_COLOR = GREY            # plain news (no CVE/domain) fallback
 
 
 def _esc(s: str) -> str:
@@ -160,10 +164,10 @@ def _story_row(idx, c, now):
 
 def _view_command(clusters, now, top):
     k = _kpis(clusters)
-    tiles = (_stat_tile(k["stories"], "Stories", "var(--accent)")
-             + _stat_tile(k["kev"], "KEV (exploited)", "#d03b3b")
-             + _stat_tile(k["crit"], "Critical CVEs", "#ec835a")
-             + _stat_tile(k["multi"], "Multi-outlet", "#1baf7a"))
+    tiles = (_stat_tile(k["stories"], "Stories", BLUE)
+             + _stat_tile(k["kev"], "KEV (exploited)", RED)
+             + _stat_tile(k["crit"], "Critical CVEs", PURPLE)
+             + _stat_tile(k["multi"], "Multi-outlet", GREEN))
     rows = "".join(_story_row(i + 1, c, now) for i, c in enumerate(clusters[:top]))
     net = [c for c in clusters if c.tags & {"networking", "bigtech", "vendor"}][:8]
     net_rows = "".join(_story_row(i + 1, c, now) for i, c in enumerate(net)) or \
@@ -201,10 +205,10 @@ def _wire_row(idx, c, now):
 def _view_wire(clusters, now, top):
     k = _kpis(clusters)
     rows = "".join(_wire_row(i + 1, c, now) for i, c in enumerate(clusters[:top]))
-    legend = ("<span style='color:#d03b3b'>▪ KEV/CRIT</span> "
-              "<span style='color:#ec835a'>▪ HIGH</span> "
-              "<span style='color:#fab219'>▪ MED</span> "
-              "<span style='color:#0ca30c'>▪ LOW</span>")
+    legend = (f"<span style='color:{RED}'>▪ KEV/CRIT</span> "
+              f"<span style='color:{PURPLE}'>▪ HIGH</span> "
+              f"<span style='color:{BLUE}'>▪ MED</span> "
+              f"<span style='color:{GREEN}'>▪ LOW</span>")
     return f"""<div class="wire">
       <div class="wire-head">▛▀ {_esc(DISPLAY_NAME.upper())} ▪ THREAT.WIRE ▪▪▪▪▪▪
         <span class="wire-count">{k['stories']} stories · {k['kev']} KEV</span></div>
@@ -235,7 +239,7 @@ def _view_triage(clusters, now, top):
     cols = {"CRITICAL": [], "HIGH": [], "WATCH": [], "NEWS": []}
     for c in clusters[:top]:
         cols[_urgency(c)].append(c)
-    head_color = {"CRITICAL": "#d03b3b", "HIGH": "#ec835a", "WATCH": "#fab219", "NEWS": "#2a78d6"}
+    head_color = {"CRITICAL": RED, "HIGH": PURPLE, "WATCH": BLUE, "NEWS": GREY}
     out = []
     for name, items in cols.items():
         cards = "".join(_card(c, now) for c in items) or '<div class="muted card-empty">—</div>'
@@ -365,11 +369,11 @@ _CSS = """
   .score-fill { height:100%; background:var(--accent); border-radius:4px; }
   .score-num { font-variant-numeric:tabular-nums; font-size:13px; color:var(--ink2); }
   .muted { color:var(--muted); }
-  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:30px; padding:14px 0 0;
-    border-top:1px solid var(--border); font-size:12px; color:var(--ink2); }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-top:12px; font-size:12px; color:var(--ink2); }
+  .legend:first-of-type { margin-top:30px; padding-top:14px; border-top:1px solid var(--border); }
+  .lg-title { font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); min-width:78px; font-size:11px; }
   .lg { display:inline-flex; align-items:center; gap:6px; }
   .lg i { width:11px; height:11px; border-radius:3px; display:inline-block; }
-  .lg-sep { width:1px; background:var(--border); align-self:stretch; }
   footer { color:var(--muted); font-size:12px; margin-top:20px; border-top:1px solid var(--border); padding-top:14px; }
   /* Threat Wire */
   .wire { background:#08080c; border:1px solid #1c1c26; border-radius:8px; overflow:hidden;
@@ -402,7 +406,7 @@ _CSS = """
   .card-chips .chip { margin-left:0; margin-right:4px; }
   .card-empty { padding:12px; text-align:center; }
   /* Executive Brief */
-  .alert { background:#2a0f0f; border:1px solid #d03b3b; color:#ffb4b4; border-radius:9px;
+  .alert { background:#2a0f0f; border:1px solid #d84141; color:#ffb4b4; border-radius:9px;
     padding:12px 16px; font-weight:600; font-size:14px; margin-bottom:16px; }
   :root[data-theme="light"] .alert { background:#fdecec; color:#8a1c1c; }
   .hero-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
@@ -436,17 +440,20 @@ _PAGE = """<!doctype html>
   </header>
   {views}
   <div class="legend">
-    <span class="lg"><i style="background:#d03b3b"></i>Critical / KEV</span>
-    <span class="lg"><i style="background:#ec835a"></i>High</span>
-    <span class="lg"><i style="background:#fab219"></i>Medium</span>
-    <span class="lg"><i style="background:#0ca30c"></i>Low</span>
-    <span class="lg-sep"></span>
-    <span class="lg"><i style="background:#2a78d6"></i>Security</span>
-    <span class="lg"><i style="background:#eb6834"></i>Networking</span>
-    <span class="lg"><i style="background:#1baf7a"></i>Bigtech</span>
-    <span class="lg"><i style="background:#eda100"></i>Advisory</span>
-    <span class="lg"><i style="background:#e87ba4"></i>Tech</span>
-    <span class="lg"><i style="background:#6b6f76"></i>N outlets (velocity)</span>
+    <span class="lg-title">Severity</span>
+    <span class="lg"><i style="background:#d84141"></i>Critical / KEV</span>
+    <span class="lg"><i style="background:#8b5cf6"></i>High</span>
+    <span class="lg"><i style="background:#2f7fd6"></i>Medium</span>
+    <span class="lg"><i style="background:#1f9d6b"></i>Low</span>
+    <span class="lg"><i style="background:#6f7480"></i>None</span>
+  </div>
+  <div class="legend">
+    <span class="lg-title">Domain</span>
+    <span class="lg"><i style="background:#2f7fd6"></i>Security</span>
+    <span class="lg"><i style="background:#8b5cf6"></i>Networking</span>
+    <span class="lg"><i style="background:#1f9d6b"></i>Bigtech</span>
+    <span class="lg"><i style="background:#d84141"></i>Advisory</span>
+    <span class="lg"><i style="background:#6f7480"></i>Tech &amp; N-outlets</span>
   </div>
   <footer>{display} · keyless security + networking/enterprise-tech intelligence · news-first ranking
     (recency + velocity + source + keyword = 70%, CVE signals = 30%). Severity follows the CISA/FIRST
