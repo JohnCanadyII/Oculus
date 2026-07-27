@@ -38,7 +38,8 @@ def cmd_scrape(args, cfg):
         err = f"  {info['error']}" if info["error"] else ""
         print(f"{name:<18} {info['status']:>7} {info['parsed']:>7} {info['new']:>5}{err}")
     print(f"\n{rep.new_articles} new articles · {rep.clusters} clusters "
-          f"({rep.multi_source} multi-source) · enriched {rep.enriched} CVEs ({rep.kev} KEV)")
+          f"({rep.multi_source} multi-source) · enriched {rep.enriched} CVEs ({rep.kev} KEV) "
+          f"· {rep.summaries} AI summaries")
 
 
 def cmd_dashboard(args, cfg):
@@ -71,6 +72,25 @@ def cmd_email(args, cfg):
         ranked = build_ranked(cfg, store)
     finally:
         store.close()
+
+    # Multi-customer: if recipients are configured, send each a tailored digest.
+    if cfg.recipients:
+        from dataclasses import replace
+        sent = errs = 0
+        for r in cfg.recipients:
+            items = deliver.filter_for_recipient(ranked, r)
+            html = render_email(items, top=r.top)
+            subject = f"{r.name}: {len(items)} stories · {sum(1 for c in items if c.any_kev)} KEV"
+            rcfg = replace(cfg.email, recipients=r.emails, enabled=True)
+            try:
+                deliver.send_digest(rcfg, html, subject, deliver.text_summary(items, r.top))
+                print(f"sent '{r.name}' digest to {', '.join(r.emails)}")
+                sent += 1
+            except deliver.EmailError as e:
+                print(f"error sending to {r.name}: {e}", file=sys.stderr)
+                errs += 1
+        return 1 if errs and not sent else 0
+
     html = render_email(ranked, top=cfg.email.top)
     subject = f"{len(ranked)} stories · {sum(1 for c in ranked if c.any_kev)} KEV"
     try:

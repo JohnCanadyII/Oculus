@@ -1,0 +1,8 @@
+# cron alternative to the systemd service or `oculus watch`.
+# Edit your crontab with:  crontab -e   then add one of these lines.
+
+# Every hour: scrape (fetch+enrich+cluster+rank+summarize) then email the digest.
+0 * * * * OCULUS_SMTP_PASSWORD='...' OCULUS_AI_KEY='...' $HOME/.local/bin/oculus scrape >> $HOME/.config/oculus/oculus.log 2>&1 && $HOME/.local/bin/oculus email >> $HOME/.config/oculus/oculus.log 2>&1
+
+# Weekday 8am only:
+# 0 8 * * 1-5 $HOME/.local/bin/oculus scrape && $HOME/.local/bin/oculus email

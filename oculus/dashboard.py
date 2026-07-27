@@ -88,18 +88,48 @@ def _chip(text, color, fg="#fff"):
     return f'<span class="chip" style="background:{color};color:{fg}">{_esc(text)}</span>'
 
 
+def _max_epss(c):
+    return max((v.epss or 0.0 for v in c.cves), default=0.0)
+
+
 def _story_chips(c):
     chips = []
     if c.any_kev:
         chips.append(_chip("KEV", SEV_COLOR["CRITICAL"]))          # red = Critical bar
     if c.max_cvss is not None:
         chips.append(_chip(f"CVSS {c.max_cvss:.1f}", SEV_COLOR[c.worst_severity]))  # matches severity chart
+    epss = _max_epss(c)
+    if epss >= 0.10:                                               # exploitation likelihood
+        chips.append(f'<span class="chip chip-outline">EPSS {epss * 100:.0f}%</span>')
     if c.source_count > 1:
         chips.append(_chip(f"{c.source_count} outlets", OUTLETS_COLOR))
     dt = _domain_tag(c)
     if dt in ("networking", "bigtech", "advisory", "tech"):        # matches coverage chart
         chips.append(_chip(dt, DOMAIN_COLOR[dt]))
     return " ".join(chips)
+
+
+# ── vendor rollup: which enterprise vendors are in the news ────────────────────
+VENDORS = ["Cisco", "Microsoft", "Palo Alto", "Fortinet", "Juniper", "VMware",
+           "Citrix", "Google", "AWS", "Nvidia", "Apple", "Oracle", "Ivanti"]
+
+
+def _vendor_counts(clusters):
+    counts = {v: 0 for v in VENDORS}
+    for c in clusters:
+        hay = " ".join(a.title for a in c.articles).lower()
+        for v in VENDORS:
+            if v.lower() in hay:
+                counts[v] += 1
+    return {v: n for v, n in sorted(counts.items(), key=lambda x: -x[1]) if n}
+
+
+def _vendor_chart(clusters):
+    counts = _vendor_counts(clusters)
+    if not counts:
+        return '<div class="muted">No named vendors in this run.</div>'
+    total = max(counts.values())
+    return "".join(_bar_row(v, n, total, DOMAIN_COLOR["networking"]) for v, n in counts.items())
 
 
 # ── shared chart pieces ────────────────────────────────────────────────────────
@@ -152,11 +182,17 @@ def _kpis(clusters):
 
 
 # ── VIEW 1: Command Center ─────────────────────────────────────────────────────
+def _ai_line(c):
+    return f'<div class="ai">🤖 {_esc(c.ai_summary)}</div>' if getattr(c, "ai_summary", "") else ""
+
+
 def _story_row(idx, c, now):
-    return f"""<tr>
+    dom = _domain_tag(c) or "security"
+    return f"""<tr class="srow" data-domain="{dom}" data-kev="{1 if c.any_kev else 0}">
       <td class="rank">{idx}</td>
       <td class="story"><a href="{_esc(_url(c))}">{_esc(_title(c))}</a>
-        <div class="meta">{_esc(_outlets(c))} · {_ago(c.last_seen, now)} {_story_chips(c)}</div></td>
+        <div class="meta">{_esc(_outlets(c))} · {_ago(c.last_seen, now)} {_story_chips(c)}</div>
+        {_ai_line(c)}</td>
       <td class="score"><div class="score-track"><div class="score-fill" style="width:{_score_pct(c):.0f}%"></div></div>
         <span class="score-num">{c.score:.2f}</span></td>
     </tr>"""
@@ -172,13 +208,25 @@ def _view_command(clusters, now, top):
     net = [c for c in clusters if c.tags & {"networking", "bigtech", "vendor"}][:8]
     net_rows = "".join(_story_row(i + 1, c, now) for i, c in enumerate(net)) or \
         '<tr><td colspan="3" class="muted">No networking/enterprise items.</td></tr>'
+    filters = ("".join(
+        f'<button class="filter-btn{" active" if f == "all" else ""}" data-filter="{f}">{label}</button>'
+        for f, label in [("all", "All"), ("kev", "KEV only"), ("networking", "Networking"),
+                         ("bigtech", "Big tech"), ("advisory", "Advisory"), ("security", "Security")]))
     return f"""
     <div class="tiles">{tiles}</div>
     <div class="panels">
       <div class="panel"><h2>CVE severity distribution</h2>{_severity_chart(clusters)}</div>
       <div class="panel"><h2>Coverage by domain</h2>{_coverage_chart(clusters)}</div>
     </div>
-    <h2>Top stories</h2><table>{rows}</table>
+    <div class="panels">
+      <div class="panel"><h2>Enterprise vendors in the news</h2>{_vendor_chart(clusters)}</div>
+      <div class="panel"><h2>Exploited &amp; critical</h2>
+        {_severity_chart([c for c in clusters if c.any_kev or (c.max_cvss or 0) >= 7]) or '<div class="muted">Nothing high-severity right now.</div>'}
+      </div>
+    </div>
+    <h2>Top stories</h2>
+    <div class="filters">{filters}</div>
+    <table id="story-table">{rows}</table>
     <h2>Networking &amp; enterprise tech — top vendors</h2><table>{net_rows}</table>"""
 
 
@@ -255,6 +303,7 @@ def _hero(c, now):
     return f"""<a class="hero" href="{_esc(_url(c))}">
       <div class="hero-chips">{_story_chips(c)}</div>
       <div class="hero-title">{_esc(_title(c))}</div>
+      {_ai_line(c)}
       <div class="hero-meta">{_esc(_outlets(c))} · {_ago(c.last_seen, now)} · score {c.score:.2f}</div></a>"""
 
 
@@ -363,6 +412,14 @@ _CSS = """
   .meta { color:var(--muted); font-size:12px; margin-top:5px; }
   .chip { display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:5px;
     margin-left:4px; vertical-align:middle; letter-spacing:.02em; }
+  .chip-outline { display:inline-block; font-size:11px; font-weight:700; padding:0 6px; border-radius:5px;
+    margin-left:4px; vertical-align:middle; border:1px solid var(--border); color:var(--ink2); }
+  .ai { color:var(--ink2); font-size:13px; margin-top:6px; line-height:1.4;
+    border-left:2px solid var(--accent); padding-left:9px; }
+  .filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .filter-btn { cursor:pointer; background:var(--surface); border:1px solid var(--border);
+    color:var(--ink2); border-radius:6px; padding:4px 11px; font-size:12px; }
+  .filter-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
   .score { width:130px; text-align:right; white-space:nowrap; }
   .score-track { display:inline-block; width:70px; height:8px; background:var(--track); border-radius:4px;
     overflow:hidden; vertical-align:middle; margin-right:8px; }
@@ -465,6 +522,16 @@ _PAGE = """<!doctype html>
       var v = b.dataset.go;
       document.querySelectorAll('.nav-btn').forEach(function(x){{x.classList.toggle('active', x===b);}});
       document.querySelectorAll('.view').forEach(function(s){{ s.hidden = (s.dataset.view !== v); }});
+    }});
+  }});
+  document.querySelectorAll('.filter-btn').forEach(function(b){{
+    b.addEventListener('click', function(){{
+      var f = b.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(function(x){{x.classList.toggle('active', x===b);}});
+      document.querySelectorAll('#story-table .srow').forEach(function(r){{
+        var show = (f==='all') || (f==='kev' ? r.dataset.kev==='1' : r.dataset.domain===f);
+        r.style.display = show ? '' : 'none';
+      }});
     }});
   }});
 </script>

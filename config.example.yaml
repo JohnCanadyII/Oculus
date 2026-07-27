@@ -1,0 +1,44 @@
+# Copy to ~/.config/oculus/config.yaml and edit. All keys are optional.
+
+# Rolling display window (days) — story count rises/falls with the news. 0 = keep all.
+retention_days: 14
+
+# Don't re-fetch a CVE enriched within this many hours (KEV/EPSS still refresh daily).
+enrich_ttl_hours: 12
+
+# Terms to boost + flag in ranking.
+watchlist: [cisco, "ios xe", sharepoint, fortinet, "palo alto", vmware]
+
+# AI summaries — built in, on by default. Local Ollama needs no key.
+ai:
+  enabled: true
+  provider: ollama            # ollama | openai | anthropic
+  model: qwen2.5:3b
+  endpoint: http://localhost:11434
+  top: 10                     # summarize the top N stories
+  # For openai/anthropic instead, set provider/model and put the key in OCULUS_AI_KEY.
+
+# Single-mailbox delivery (put the password in OCULUS_SMTP_PASSWORD, not here).
+email:
+  enabled: true
+  host: smtp.gmail.com
+  port: 587
+  use_tls: true
+  username: you@example.com
+  sender: you@example.com
+  recipients: [you@example.com]
+  top: 15
+
+# Multi-customer delivery — each gets a digest tailored to their domains/watchlist.
+# `oculus email` sends one per recipient. Uses the same SMTP settings above.
+recipients:
+  - name: NetworkingTeam
+    emails: [neteng@example.com]
+    tags: [networking, security]      # only these domains
+    watchlist: [cisco, juniper, "palo alto"]
+    top: 12
+  - name: ExecBrief
+    emails: [ciso@example.com]
+    tags: []                          # everything
+    watchlist: [kev, ransomware]
+    top: 8

@@ -78,10 +78,10 @@ oculus scrape && oculus dashboard --open
 
 | Command | What it does |
 |---|---|
-| `oculus scrape` | Fetch every enabled feed, dedup, extract + enrich CVEs, cluster, rank. |
-| `oculus dashboard [-o FILE] [--top N] [--open]` | Render the enhanced HTML dashboard. |
+| `oculus scrape` | Fetch every feed, dedup, extract + enrich CVEs, cluster, rank, summarize. |
+| `oculus dashboard [-o FILE] [--top N] [--open]` | Render the four-layout HTML dashboard. |
 | `oculus digest [--top N]` | Print a ranked text digest. |
-| `oculus email` | Send the HTML digest by email (see config). |
+| `oculus email` | Email the digest — one per recipient when multi-customer is configured. |
 | `oculus watch [--interval M]` | Endpoint daemon: scrape + email on a timer. |
 | `oculus sources` | List configured feeds. |
 
@@ -115,6 +115,47 @@ export OCULUS_SMTP_PASSWORD='...'
 oculus email
 ```
 
+### Multi-customer delivery
+
+Add a `recipients:` list to `config.yaml` and `oculus email` sends each one a
+digest tailored to their domains and watchlist (see `config.example.yaml`):
+
+```yaml
+recipients:
+  - name: NetworkingTeam
+    emails: [neteng@example.com]
+    tags: [networking, security]     # only these domains
+    watchlist: [cisco, juniper]
+    top: 12
+```
+
+## AI summaries (built in)
+
+Every scrape writes a one-to-two sentence brief for the top stories, shown on the
+dashboard (🤖) and in emails. It uses a local **Ollama** model by default — no API
+key — and falls back gracefully if no model is reachable, so a scrape never fails
+on AI. Point it at OpenAI or Anthropic instead via `ai.provider` + `OCULUS_AI_KEY`.
+
+```bash
+# one-time local model (keyless):
+ollama pull qwen2.5:3b
+```
+
+## Testing
+
+```bash
+pip install -e ".[dev]"
+pytest            # 26 offline tests: golden-order ranking, clustering,
+                  # CVE parsing (Log4Shell + EPSS traps), dedup, TTL cache, render
+```
+
+## Packaging & endpoints
+
+- `pipx install oculus-intel` — the happy path.
+- Single-file binary: `pip install ".[build]" && pyinstaller packaging/oculus.spec`.
+- Scheduled on an endpoint: `packaging/oculus.service` (systemd) or
+  `packaging/oculus.cron`.
+
 ## Running on a customer endpoint
 
 Oculus is a self-contained pip package. On a customer machine:
@@ -140,7 +181,26 @@ unit and a `cron` line, plus a PyInstaller recipe for a single-file binary.
 
 See `ARCHITECTURE.md` for the full pipeline and `BUILD_PLAN.md` for the phased
 roadmap. In short: `fetch → parse → normalize → ingest/dedup → CVE extract →
-cluster (union-find) → enrich (KEV/EPSS/CVE Program) → rank → dashboard/email`.
+cluster (union-find) → enrich (KEV/EPSS/CVE Program) → rank → summarize → dashboard/email`.
+
+## Roadmap
+
+**Done**
+- [x] Keyless ingest → cluster → enrich → rank pipeline
+- [x] Four dashboard layouts (Command Center, Threat Wire, Triage, Executive Brief)
+- [x] Unified five-color severity/domain palette
+- [x] Email delivery (SMTP) + rolling retention window
+- [x] TTL cache so repeat scrapes skip freshly-enriched CVEs
+- [x] AI summaries — built in, local Ollama by default, fail-soft
+- [x] Multi-customer delivery (per-recipient domains & watchlists)
+- [x] Dashboard extras: EPSS chips, vendor rollups, interactive filters
+- [x] Offline test suite (26 tests) — golden-order ranking, CVE traps, dedup, TTL
+- [x] Packaging: `pipx`, PyInstaller spec, systemd + cron recipes
+
+**Next**
+- [ ] CI (GitHub Actions running the test suite)
+- [ ] EPSS/velocity history for true sparklines over time
+- [ ] Publish to PyPI + prebuilt binaries per OS
 
 ## License
 

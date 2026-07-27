@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS cves (
     is_kev INTEGER, kev_ransomware INTEGER,
     epss REAL, epss_percentile REAL, enriched_at INTEGER, enrich_status TEXT
 );
+CREATE TABLE IF NOT EXISTS ai_notes (
+    cluster_key TEXT, provider TEXT, summary TEXT, created_at INTEGER,
+    PRIMARY KEY (cluster_key, provider)
+);
 """
 
 
@@ -116,11 +120,15 @@ class Store:
             out.setdefault(r["article_id"], []).append(r["cve_id"])
         return {k: tuple(v) for k, v in out.items()}
 
-    def pending_cve_ids(self) -> list[str]:
+    def pending_cve_ids(self, ttl_cutoff: int = 0) -> list[str]:
+        """CVEs needing enrichment: never enriched, failed, or last enriched before
+        ttl_cutoff (unix seconds). A fresh record within TTL is skipped — the cache."""
         rows = self.conn.execute(
             "SELECT DISTINCT ac.cve_id FROM article_cves ac "
             "LEFT JOIN cves c ON c.id = ac.cve_id "
-            "WHERE c.id IS NULL OR c.enrich_status != 'ok'"
+            "WHERE c.id IS NULL OR c.enrich_status != 'ok' "
+            "OR c.enriched_at IS NULL OR c.enriched_at < ?",
+            (ttl_cutoff,),
         ).fetchall()
         return [r["cve_id"] for r in rows]
 
@@ -156,3 +164,22 @@ class Store:
             f"SELECT id, source_name, title, canonical_url, summary, published_at "
             f"FROM articles WHERE id IN ({q})", list(ids)
         ).fetchall()
+
+    # ── AI notes ─────────────────────────────────────────────────────────
+    def upsert_ai_note(self, cluster_key, provider, summary, now):
+        self.conn.execute(
+            "INSERT INTO ai_notes(cluster_key,provider,summary,created_at) VALUES(?,?,?,?) "
+            "ON CONFLICT(cluster_key,provider) DO UPDATE SET summary=excluded.summary,"
+            "created_at=excluded.created_at",
+            (cluster_key, provider, summary, now),
+        )
+        self.conn.commit()
+
+    def ai_notes_map(self, provider: str) -> dict[str, str]:
+        return {r["cluster_key"]: r["summary"] for r in self.conn.execute(
+            "SELECT cluster_key, summary FROM ai_notes WHERE provider=?", (provider,))}
+
+    def has_ai_note(self, cluster_key, provider) -> bool:
+        return self.conn.execute(
+            "SELECT 1 FROM ai_notes WHERE cluster_key=? AND provider=?",
+            (cluster_key, provider)).fetchone() is not None

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from . import cluster as cluster_mod
 from . import parse as parse_mod
 from . import rank as rank_mod
+from .ai import Summarizer, make_provider
 from .cve import Enricher, severity_band
 from .config import Config
 from .fetch import fetch_all
@@ -49,6 +50,7 @@ class RankedCluster:
     articles: list[RankedArticle]
     cves: list[RankedCVE]
     tags: set[str] = field(default_factory=set)
+    ai_summary: str = ""
 
     @property
     def worst_severity(self) -> str:
@@ -76,6 +78,7 @@ class ScrapeReport:
     multi_source: int
     enriched: int
     kev: int
+    summaries: int = 0
 
 
 def _ingest(cfg: Config, store: Store) -> ScrapeReport:
@@ -101,10 +104,11 @@ def _ingest(cfg: Config, store: Store) -> ScrapeReport:
             store.save_fetch_state(res.source.name, res.etag, res.last_modified, 304, now)
         per_source[res.source.name] = info
 
-    # ── enrich CVEs (best-effort, non-fatal) ──
+    # ── enrich CVEs (best-effort, non-fatal, TTL-cached) ──
     enriched = kev = 0
     if cfg.enrich_cves:
-        pending = store.pending_cve_ids()
+        ttl_cutoff = now - cfg.enrich_ttl_hours * 3600
+        pending = store.pending_cve_ids(ttl_cutoff)
         if pending:
             enr = Enricher(cfg.fetch.user_agent, cfg.fetch.timeout)
             try:
@@ -116,11 +120,33 @@ def _ingest(cfg: Config, store: Store) -> ScrapeReport:
                 enr.close()
 
     ranked = build_ranked(cfg, store)
+    summaries = summarize_and_store(cfg, store, ranked) if cfg.ai.enabled else 0
     return ScrapeReport(
         per_source=per_source, new_articles=new_total, clusters=len(ranked),
         multi_source=sum(1 for c in ranked if c.source_count > 1),
-        enriched=enriched, kev=kev,
+        enriched=enriched, kev=kev, summaries=summaries,
     )
+
+
+def summarize_and_store(cfg: Config, store: Store, ranked: list["RankedCluster"]) -> int:
+    """Generate an AI brief for the top-N ranked clusters that don't have one yet.
+    Fail-soft: if the model is unreachable, nothing is stored and 0 is returned."""
+    provider = make_provider(cfg.ai)
+    summarizer = Summarizer(provider)
+    now = int(time.time())
+    count = 0
+    for c in ranked[:cfg.ai.top]:
+        if store.has_ai_note(c.key, provider.name):
+            continue
+        art = c.articles[0] if c.articles else None
+        text = summarizer.summarize(
+            art.title if art else "", ", ".join(sorted({a.source_name for a in c.articles})),
+            [v.id for v in c.cves], art.summary if art else "",
+        )
+        if text:
+            store.upsert_ai_note(c.key, provider.name, text, now)
+            count += 1
+    return count
 
 
 def build_ranked(cfg: Config, store: Store) -> list[RankedCluster]:
@@ -140,6 +166,7 @@ def build_ranked(cfg: Config, store: Store) -> list[RankedCluster]:
     weights = store.source_weights()
     tags = store.source_tags()
     cve_map = store.cve_map()
+    ai_notes = store.ai_notes_map(cfg.ai.provider)
     now = int(time.time())
     out: list[RankedCluster] = []
 
@@ -180,6 +207,7 @@ def build_ranked(cfg: Config, store: Store) -> list[RankedCluster]:
             key=c.key, score=rank_mod.score(sig, cfg.rank), size=c.size,
             source_count=c.source_count, first_seen=c.first_seen, last_seen=c.last_seen,
             articles=r_articles, cves=r_cves, tags=cluster_tags,
+            ai_summary=ai_notes.get(c.key, ""),
         ))
 
     # Rolling display window: drop clusters whose most recent article is older

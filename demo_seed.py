@@ -109,6 +109,20 @@ def main():
         store.upsert_cve(rec, NOW)
 
     ranked = build_ranked(cfg, store)
+
+    # Mock AI summaries for the demo (no live Ollama in this sandbox). In real use,
+    # `oculus scrape` generates these from a local model automatically.
+    MOCK = [
+        "A critical SharePoint RCE is being exploited in the wild and now sits on CISA's KEV list — patch internet-facing servers immediately.",
+        "Attackers are actively abusing a max-severity Cisco IOS XE web UI flaw to seize enterprise routers; apply Cisco's fix now.",
+        "Cisco's new AI-native fabric targets enterprise data centers, spanning Nexus switching and Silicon One silicon.",
+        "A PAN-OS GlobalProtect flaw affects Palo Alto firewalls; medium severity but worth prioritizing on exposed gateways.",
+        "Nvidia's next-gen data-center GPUs lean into enterprise AI and networking demand as clusters scale.",
+        "Google Cloud rolls out zero-trust networking controls aimed at segmenting enterprise workloads.",
+    ]
+    for c, text in zip(ranked[:len(MOCK)], MOCK):
+        store.upsert_ai_note(c.key, cfg.ai.provider, text, NOW)
+    ranked = build_ranked(cfg, store)  # re-read so summaries attach
     store.close()
     out = Path(__file__).parent / "demo_dashboard.html"
     out.write_text(render(ranked, top=25))

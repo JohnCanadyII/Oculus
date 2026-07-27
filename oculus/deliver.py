@@ -43,6 +43,24 @@ def send_digest(cfg: Email, html_body: str, subject: str, text_fallback: str = "
         raise EmailError(f"SMTP send failed: {e}") from e
 
 
+def filter_for_recipient(clusters, recipient):
+    """Tailor the digest to one customer: keep only their domains (if set), cap at
+    their `top`, and float their watchlist hits to the front."""
+    items = list(clusters) if not recipient.tags else [
+        c for c in clusters if c.tags & set(recipient.tags)
+    ]
+    if recipient.watchlist:
+        terms = [t.lower() for t in recipient.watchlist]
+
+        def hit(c):
+            hay = " ".join(a.title.lower() for a in c.articles) + " " + \
+                  " ".join(v.id.lower() for v in c.cves)
+            return any(t in hay for t in terms)
+
+        items.sort(key=lambda c: (hit(c), c.score), reverse=True)
+    return items[:recipient.top]
+
+
 def text_summary(clusters, top: int = 15) -> str:
     lines = []
     for i, c in enumerate(clusters[:top], 1):

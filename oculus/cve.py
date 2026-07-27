@@ -99,6 +99,27 @@ def _resolve_description(record: dict) -> str:
     return ""
 
 
+def parse_kev(data: dict) -> dict[str, bool]:
+    """CVE -> ransomware flag. `knownRansomwareCampaignUse` is the string
+    'Known'/'Unknown', NOT a boolean — map it explicitly."""
+    out: dict[str, bool] = {}
+    for v in data.get("vulnerabilities", []) or []:
+        out[v["cveID"].upper()] = v.get("knownRansomwareCampaignUse", "Unknown") == "Known"
+    return out
+
+
+def parse_epss(payload: dict) -> dict[str, tuple[float, float]]:
+    """CVE -> (epss, percentile). The API returns these as JSON STRINGS — parse as
+    float or they silently read as zero and disable a ranking signal."""
+    out: dict[str, tuple[float, float]] = {}
+    for row in payload.get("data", []) or []:
+        try:
+            out[row["cve"].upper()] = (float(row["epss"]), float(row["percentile"]))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return out
+
+
 class Enricher:
     """Fetches KEV + EPSS in bulk once, then per-CVE cvelistV5 records."""
 
@@ -117,11 +138,7 @@ class Enricher:
             return self._kev
         self._kev = {}
         try:
-            data = self._client.get(KEV_URL).json()
-            for v in data.get("vulnerabilities", []):
-                # `knownRansomwareCampaignUse` is the string "Known"/"Unknown", not a bool.
-                ransom = v.get("knownRansomwareCampaignUse", "Unknown") == "Known"
-                self._kev[v["cveID"].upper()] = ransom
+            self._kev = parse_kev(self._client.get(KEV_URL).json())
         except (httpx.HTTPError, ValueError, KeyError):
             pass
         return self._kev
@@ -135,9 +152,7 @@ class Enricher:
             chunk = cves[i:i + 100]
             try:
                 r = self._client.get(EPSS_URL, params={"cve": ",".join(chunk)})
-                for row in r.json().get("data", []):
-                    # epss/percentile arrive as STRINGS — parse as float or they read 0.
-                    out[row["cve"].upper()] = (float(row["epss"]), float(row["percentile"]))
+                out.update(parse_epss(r.json()))
             except (httpx.HTTPError, ValueError, KeyError):
                 continue
         return out

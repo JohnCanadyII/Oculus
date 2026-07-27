@@ -1,0 +1,26 @@
+# systemd user service — runs Oculus on a timer on a customer endpoint.
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp packaging/oculus.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now oculus.service
+#   journalctl --user -u oculus -f        # watch logs
+#
+# Put the SMTP password (and any AI key) in ~/.config/oculus/oculus.env, e.g.:
+#   OCULUS_SMTP_PASSWORD=...
+#   OCULUS_AI_KEY=...
+
+[Unit]
+Description=Oculus threat & enterprise-tech intelligence watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/oculus/oculus.env
+ExecStart=%h/.local/bin/oculus watch --interval 60
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

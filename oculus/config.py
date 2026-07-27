@@ -91,17 +91,46 @@ class Email:
 
 
 @dataclass(frozen=True)
+class Recipient:
+    """One customer/endpoint that gets a tailored digest."""
+    name: str
+    emails: tuple[str, ...]
+    tags: tuple[str, ...] = ()          # only include stories in these domains ([] = all)
+    watchlist: tuple[str, ...] = ()     # boost + subject-flag these terms
+    top: int = 15
+
+
+@dataclass(frozen=True)
+class AI:
+    """AI summaries — a built-in feature, on by default. Uses a local Ollama model
+    with no key; falls back gracefully (marks summaries pending) if none is reachable,
+    so a scrape never fails on AI."""
+    enabled: bool = True
+    provider: str = "ollama"            # ollama | openai | anthropic
+    model: str = "qwen2.5:3b"
+    endpoint: str = "http://localhost:11434"   # ollama default
+    api_key: str = ""                   # prefer OCULUS_AI_KEY env
+    top: int = 10                       # summarize the top N ranked clusters
+    timeout: float = 60.0
+
+
+@dataclass(frozen=True)
 class Config:
     sources: tuple[Source, ...]
     rank: Rank = field(default_factory=Rank)
     fetch: Fetch = field(default_factory=Fetch)
     cluster: Cluster = field(default_factory=Cluster)
     email: Email = field(default_factory=Email)
+    ai: AI = field(default_factory=AI)
+    recipients: tuple[Recipient, ...] = ()
     enrich_cves: bool = True
     # Rolling display window: only show stories with activity in the last N days,
     # so the dashboard reflects *current* news and the count rises/falls over time.
     # 0 = no limit (keep everything). Overridable via config.yaml.
     retention_days: int = 14
+    # TTL cache: don't re-fetch a CVE enriched within this many hours (KEV/EPSS
+    # change daily, so we still refresh, just not every scrape).
+    enrich_ttl_hours: int = 12
 
 
 def _load_sources(path: Path) -> tuple[Source, ...]:
@@ -156,7 +185,25 @@ def _apply_overrides(cfg: Config, data: dict) -> Config:
     if "watchlist" in data:
         rank = replace(rank, watchlist=tuple(data["watchlist"]))
     retention = int(data.get("retention_days", cfg.retention_days))
-    return replace(cfg, email=email, rank=rank, retention_days=retention)
+    ttl = int(data.get("enrich_ttl_hours", cfg.enrich_ttl_hours))
+
+    ai = cfg.ai
+    if "ai" in data:
+        a = data["ai"]
+        ai = replace(ai, enabled=a.get("enabled", ai.enabled), provider=a.get("provider", ai.provider),
+                     model=a.get("model", ai.model), endpoint=a.get("endpoint", ai.endpoint),
+                     api_key=a.get("api_key", ai.api_key), top=int(a.get("top", ai.top)))
+
+    recipients = cfg.recipients
+    if "recipients" in data:
+        recipients = tuple(
+            Recipient(name=r["name"], emails=tuple(r.get("emails", [])),
+                      tags=tuple(r.get("tags", [])), watchlist=tuple(r.get("watchlist", [])),
+                      top=int(r.get("top", 15)))
+            for r in data["recipients"]
+        )
+    return replace(cfg, email=email, rank=rank, retention_days=retention,
+                   enrich_ttl_hours=ttl, ai=ai, recipients=recipients)
 
 
 def _apply_env(cfg: Config) -> Config:
@@ -167,4 +214,8 @@ def _apply_env(cfg: Config) -> Config:
     rcpt = os.environ.get("OCULUS_EMAIL_TO")
     if rcpt:
         email = replace(email, recipients=tuple(x.strip() for x in rcpt.split(",") if x.strip()))
-    return replace(cfg, email=email)
+    ai = cfg.ai
+    ai_key = os.environ.get("OCULUS_AI_KEY")
+    if ai_key:
+        ai = replace(ai, api_key=ai_key)
+    return replace(cfg, email=email, ai=ai)
