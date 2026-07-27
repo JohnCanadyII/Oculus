@@ -18,7 +18,7 @@ from pathlib import Path
 from . import config as config_mod
 from . import deliver
 from .config import DISPLAY_NAME, db_path, load
-from .dashboard import render
+from .dashboard import render, render_email
 from .ingest import build_ranked, ingest_and_rank
 from .store import Store
 
@@ -71,7 +71,7 @@ def cmd_email(args, cfg):
         ranked = build_ranked(cfg, store)
     finally:
         store.close()
-    html = render(ranked, top=cfg.email.top)
+    html = render_email(ranked, top=cfg.email.top)
     subject = f"{len(ranked)} stories · {sum(1 for c in ranked if c.any_kev)} KEV"
     try:
         deliver.send_digest(cfg.email, html, subject, deliver.text_summary(ranked, cfg.email.top))
@@ -94,7 +94,7 @@ def cmd_watch(args, cfg):
             store.close()
         print(f"[{time.strftime('%H:%M:%S')}] {rep.new_articles} new · {rep.clusters} clusters")
         if cfg.email.enabled and rep.new_articles > 0:
-            html = render(ranked, top=cfg.email.top)
+            html = render_email(ranked, top=cfg.email.top)
             try:
                 deliver.send_digest(cfg.email, html,
                                     f"{rep.new_articles} new stories",
