@@ -1,6 +1,11 @@
-# Oculus
+# ▲ Oculus
 
 **Keyless security + networking/enterprise-tech news & CVE intelligence engine.**
+
+![Python](https://img.shields.io/badge/python-3.10%2B-2f7fd6)
+![License](https://img.shields.io/badge/license-AGPL--3.0-1f9d6b)
+![API keys](https://img.shields.io/badge/API%20keys-none%20required-1f9d6b)
+![Sources](https://img.shields.io/badge/feeds-security%20%2B%20networking%20%2B%20big--tech-8b5cf6)
 
 Oculus points at a set of RSS/Atom feeds, fetches them politely, clusters the same
 story as it appears across outlets, extracts every CVE, enriches each one with
@@ -14,6 +19,40 @@ expanded feed set that covers **Cisco, networking, and big-tech / enterprise
 vendors** alongside security, a chart-driven dashboard, and email delivery.
 
 No API keys required for the core. The CVE data comes from keyless public sources.
+
+![Oculus — Command Center](assets/command-center.png)
+
+---
+
+## Dashboard layouts
+
+Oculus renders one dataset four ways — switch between them live in the browser,
+or email the Executive Brief on a schedule. Every chart and chip shares one
+five-color system (red / purple / blue / green / grey) for severity and domain.
+
+### Command Center
+KPI tiles, a CVE-severity chart, a coverage-by-domain chart, and the ranked
+story list with score meters and KEV/CVSS chips.
+
+![Command Center](assets/command-center.png)
+
+### Threat Wire
+A terminal / SOC-feed view: severity-colored edge bars, sparkbar scores, and
+a dense one-line-per-story wire.
+
+![Threat Wire](assets/threat-wire.png)
+
+### Triage Board
+A kanban board that sorts stories by urgency — Critical, High, Watch, News —
+so you see what to act on first.
+
+![Triage Board](assets/triage-board.png)
+
+### Executive Brief
+A skim-first layout: a KEV alert banner, five hero cards, compact charts, and
+a short list. This is also the format emailed on a schedule.
+
+![Executive Brief](assets/executive-brief.png)
 
 ---
 
