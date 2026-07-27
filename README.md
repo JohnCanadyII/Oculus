@@ -153,8 +153,9 @@ pytest            # 26 offline tests: golden-order ranking, clustering,
 
 - `pipx install oculus-intel` — the happy path.
 - Single-file binary: `pip install ".[build]" && pyinstaller packaging/oculus.spec`.
-- Scheduled on an endpoint: `packaging/oculus.service` (systemd) or
-  `packaging/oculus.cron`.
+- Scheduled on an endpoint: `packaging/oculus.service` (systemd),
+  `packaging/oculus.cron` (cron), or `packaging/oculus-daily.ps1` +
+  Windows Task Scheduler for a daily 7am email (setup steps in that file).
 
 ## Running on a customer endpoint
 
