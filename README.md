@@ -14,10 +14,6 @@ ranks the whole set by real-world significance, and renders it as an **enhanced
 HTML dashboard with charts** — which it can also **email** to you or your customers
 and run on a schedule on any **endpoint**.
 
-It is a Python port of the Go project *Nadezhda*, personalized: a new name, an
-expanded feed set that covers **Cisco, networking, and big-tech / enterprise
-vendors** alongside security, a chart-driven dashboard, and email delivery.
-
 No API keys required for the core. The CVE data comes from keyless public sources.
 
 ![Oculus — Command Center](assets/command-center.png)
